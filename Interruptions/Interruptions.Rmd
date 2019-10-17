@@ -1,0 +1,155 @@
+---
+title: "Spatial Capture-Recapture: Wolverine Example"
+author: "Daniel Turek and Cyril Milleret"
+date: 17 October 2019
+output: html_document
+---
+  
+  <!---
+  http://cyrilmi.github.io/Interruptions/Interruptions.html 
+-->
+  
+  
+  
+  <!--
+  Back to [NIMBLE Vignettes](https://cyrilmi.github.io/Interruptions/Interruptions.html) 
+-->
+  
+  
+  \  
+
+This example demonstrates the Wolverine example model, as in
+"Efficient MCMC for Spatial Capture-Recapture Models" (Turek *et al*,
+                                                       *submitted*).
+
+Specifically, we implement the final version of the
+model and MCMC.  Details of the functions and procedure are provided therein.
+
+
+
+\   
+
+### Load Libraries 
+
+```{r message = FALSE}
+library(nimble)
+```
+
+
+
+\  
+
+### Define Custom Distributions
+
+We define two custom distributions for use in the model.
+
+`dBernoulliVector3` implements the vectorized likelihood calculations, only
+for individuals in the population, and for a restricted set of traps.
+
+`dHabitat` enforces the habitat mask to restrict activity center
+locations to the habitable regions of the study area.
+
+We also register these distributions for use in `nimble` models, using
+`registerDistributions`.  But even without doing this, `nimble` would
+find them at the time of model building.
+
+
+```{r eval = FALSE}
+dBernoulliVector3 <- nimbleFunction(
+  run = function(
+    x = double(1), pZero = double(0), sxy = double(1), sigma = double(0),
+    nbDetections = double(0), yDets = double(1), detector.xy = double(2),
+    trials = double(1), detectorIndex = double(2), nDetectors = double(1),
+    ResizeFactor = double(0, default = 1), maxNBDets = double(0),
+    habitatID = double(2), indicator = double(0), log = integer(0)) {
+    ##
+    numTrials <- length(trials)
+    ##
+    if(indicator == 0) {
+      if(nbDetections == 0) {
+        if(log == 0) return(1)
+        else return(0)
+      } else {
+        if(log == 0) return(0)
+        else return(-Inf)
+      }
+    }
+    ##
+    sxyID <- habitatID[trunc(sxy[2]/ResizeFactor)+1, trunc(sxy[1]/ResizeFactor)+1]
+    index <- detectorIndex[sxyID, 1:nDetectors[sxyID]]
+    ##
+    y <- nimNumeric(length = numTrials, value = 0, init = TRUE)
+    ##
+    if(nbDetections > 0) {
+      for(r in 1:nbDetections) {
+        y[yDets[r]] <- x[r] 
+        if(sum(yDets[r]==index) == 0) {
+          if(log == 0) return(0)
+          else return(-Inf)
+        } 
+      } 
+    }
+    ##
+    alpha <- -1/(2*sigma^2)
+    lp <- 0
+    count <- 1 
+    index1 <- c(index, 0)   # necessary
+    ##
+    for(r in 1:numTrials) {
+      if(index1[count] == r) {
+        d2 <- (detector.xy[r,1] - sxy[1])^2 + (detector.xy[r,2] - sxy[2])^2
+        p <- pZero * exp(alpha * d2)
+        lp <- lp + dbinom(y[r], prob = p, size = trials[r], log = TRUE)
+        count <- count + 1
+      }
+    }
+    ##
+    returnType(double(0))
+    return(lp)
+  }
+)
+dHabitat <- nimbleFunction(
+  run = function(x = double(0), sxy = double(1), lower = double(1),
+                 upper = double(1), habitat = double(2), log = double()) {
+    if(sxy[1] < lower[1]) return(-Inf)
+    if(sxy[1] > upper[1]) return(-Inf)
+    if(sxy[2] < lower[2]) return(-Inf)
+    if(sxy[2] > upper[2]) return(-Inf)
+    ## habitat constraint:
+    if(habitat[trunc(sxy[2])+1, trunc(sxy[1])+1] == 0) return(-Inf)
+    returnType(double())
+    return(0)
+  }
+)
+registerDistributions(
+  list(
+    dBernoulliVector3 = list(
+      BUGSdist = "dBernoulliVector3(pZero, sxy, sigma, nbDetections, yDets, 
+                detector.xy, trials, detectorIndex, nDetectors,
+                ResizeFactor, maxNBDets, habitatID, indicator)",
+      types = c("value = double(1)", "pZero = double(0)","sxy = double(1)",
+                "sigma = double(0)", "nbDetections = double(0)",
+                "yDets = double(1)", "detector.xy = double(2)",
+                "trials = double(1)","detectorIndex = double(2)" ,
+                "nDetectors = double(1)", "ResizeFactor = double(0)",
+                "maxNBDets = double(0)","habitatID= double(2)",
+                "indicator = double(0)"),
+      mixedSizes = TRUE)))
+registerDistributions(
+  list(
+    dHabitat = list(
+      BUGSdist = "dHabitat(sxy, lower, upper, habitat)",
+      types = c("value = double(0)", "sxy = double(1)", "lower = double(1)",
+                "upper = double(1)", "habitat = double(2)"),
+      mixedSizes = TRUE)
+  )
+)
+```
+
+\   
+
+### Define Model Structure
+
+Next we define the model struture.
+
+This uses the two custom distributions defined above.
