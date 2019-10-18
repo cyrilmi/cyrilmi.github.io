@@ -1,7 +1,8 @@
 ---
-title: "Spatial Capture-Recapture: Wolverine Example"
-author: "Daniel Turek and Cyril Milleret"
-date: 17 October 2019
+title: "Supporting information 2: Estimating abudance with interruption in data collection.
+  Simulations and case studies using open population spatial capture-recapture"
+author: "Cyril Milleret"
+date: 18 October 2019
 output: html_document
 ---
   
@@ -18,13 +19,7 @@ output: html_document
   
   \  
 
-This example demonstrates the Wolverine example model, as in
-"Efficient MCMC for Spatial Capture-Recapture Models" (Turek *et al*,
-                                                       *submitted*).
-
-Specifically, we implement the final version of the
-model and MCMC.  Details of the functions and procedure are provided therein.
-
+This script performs a data set simulation and OPSCR modelling in the presence of sampling interuptions with NIMBLE [@NIMBLE; @deValpine2017]. All details about the procedure are provided in Milleret et al. Estimating abundance with interruption in data collection: Simulations and case studies using open population spatial capture-recapture models.
 
 
 \   
@@ -32,8 +27,36 @@ model and MCMC.  Details of the functions and procedure are provided therein.
 ### Load Libraries 
 
 ```{r message = FALSE}
+library(rgdal)
+library(raster)
+library(rgeos)
+library(sp)
 library(nimble)
+library(abind)
+library(boot)
+library(coda)
 ```
+
+
+Download the .R data file Containing the R functions [here](http://cyrilmi.github.io/Interruptions/SourceRFunctions.R), the Nimble functions [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R) and [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R) 
+
+Set working directory where the *SourceRFunctions.R*, *SourceNimblePointProcess.R* and *SourceNimbleObservationModel.R* are located and source the files.
+
+```{r source1, echo=T,eval=FALSE}
+setwd("YourWorkingdirectory")
+source("SourceRFunctions.R")
+source("SourceNimblePointProcess.R")
+source("SourceNimbleObservationModel.R")
+```
+
+
+```{r source, echo=F,message=FALSE,warning=FALSE,cache.comments=TRUE}
+setwd("C:/My_documents/rovquant/analyses/Simulations/simulations_interuption/")
+source("SourceRFunctions.R")
+source("SourceNimblePointProcess.R")
+source("SourceNimbleObservationModel.R")
+```
+
 
 
 
