@@ -4,6 +4,8 @@ title: "Supporting information 2: Estimating abudance with interruption in data 
 author: "Cyril Milleret"
 date: 18 October 2019
 output: html_document
+bibliography: references.bib
+
 ---
   
   <!---
