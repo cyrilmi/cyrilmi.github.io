@@ -283,3 +283,256 @@ for(i in 1:length(params))
       if(!is.null(sim.values)){abline(v = sim.values[i], col = "red", lwd = 2)}}
    }
 }
+
+
+
+GetDetectorIndexLESS <- function(habitat.mx = habitat.mx
+                                 ,
+                                 detectors.xy = detectors.xy
+                                 ,
+                                 maxDist = maxDist
+                                 ,
+                                 ResizeFactor = 1
+                                 ,
+                                 plot.check = TRUE
+){
+   
+   
+   ## ==== 1. CREATE THE XY COORDINATES OF THE HABITAT ====
+   habitatID <- habCoordsx <- habCoordsy <- habitat.mx 
+   if(ResizeFactor == 1){
+      from <- 0.5
+      ResizeFactor <- 1 
+   }else{  
+      from <- (ResizeFactor/2) + 0.5
+   }
+   ## get dimensions matrix 
+   dimCoords <- c(ceiling(dim(habCoordsx)[1]/ResizeFactor), ceiling(dim(habCoordsx)[2]/ResizeFactor))
+   CoordsMax <- dimCoords*ResizeFactor
+   
+   habCoordsx <- matrix(rep(seq(from, CoordsMax[2], by=ResizeFactor ), dimCoords[1]),
+                        nrow = dimCoords[1], ncol= dimCoords[2], byrow = T )
+   habCoordsy <- matrix(rep(seq(from, CoordsMax[1], by=ResizeFactor ), dimCoords[2]),
+                        nrow = dimCoords[1], ncol=dimCoords[2], byrow = F )
+   habCoordsy <- as.vector(habCoordsy)
+   habCoordsx <- as.vector(habCoordsx)
+   
+   ## coordinates from habitat 
+   habCoordsxy <- cbind(habCoordsx, habCoordsy)
+   
+   
+   ## ====   2. RESCALE THE HABITAT   ====
+   r <- raster(habitat.mx)
+   if(ResizeFactor>1){ r <- aggregate(r, fact= ResizeFactor)}
+   r[r>0] <-1
+   # plot(r)
+   habitat.mx1 <- as.matrix(r)
+   
+   # CREATE A HABITAT ID MATRIX 
+   habitatID <- habitat.mx1
+   habitatID[] <- as.character(habitat.mx1)
+   # ONLY GIVE AN ID TO THE HABITAT CELLS==1 
+   habitatID[habitat.mx1 == "1"] <- 1:sum(habitat.mx1=="1")
+   m <- sapply(habitatID, FUN=as.numeric)
+   habitatID <- matrix(m, nrow=dim(habitatID)[1], ncol=dim(habitatID)[2], byrow =F)
+   
+   ##REMOVE HABITAT CELL COORDINATES THAT ARE NOT HABITAT  
+   habCoordsxy  <- habCoordsxy[as.character(as.vector(habitat.mx1))=="1",]
+   
+   ## ==== 3. DETERMINE DETECTORS THAT ARE WITHIN A CERTAIN DISTANCE FROM EACH HABITAT CELL  ====
+   # Determine detector within radius distance from the center of each habitat cell
+   detector.index <- apply(habCoordsxy, 1, function(x){
+      D <- sqrt((x[1] - detectors.xy[,1])^2 + (x[2] - detectors.xy[,2])^2) 
+      which(D< maxDist)
+   })
+   
+   #make sure it always returns a list. 
+   if(class(detector.index)=="matrix"){
+      detector.index <- lapply(1:dim(detector.index)[2],function(x) detector.index[,x])
+   }
+   
+   ## ==== 4. STORE DETECTOR INDEX IN A MATRIX ====
+   # get number of detectors within the radius for each cell
+   nDetectorsLESS <- unlist(lapply(detector.index, function(x) length(x)))
+   maxNBDets <- max(nDetectorsLESS)
+   # store detector index (colums) for each habitat cell (rows)
+   detectorIndex <- matrix(0, nrow=length(detector.index), ncol = maxNBDets)
+   for(j in 1:length(detector.index)){
+      if(length(detector.index[[j]])!=0){
+         detectorIndex[j, 1:nDetectorsLESS[j]] <- detector.index[[j]]
+      }
+   }
+   
+   ##PLOT CHECK 
+   if(plot.check){
+      SXY <- habCoordsxy[sample(1:dim(habCoordsxy)[1],size=1),]# + c(jitter(0,factor = 2), jitter(0,factor = 2) )
+      sxyID <- habitatID[trunc(SXY[2]/ResizeFactor)+1, trunc(SXY[1]/ResizeFactor)+1]
+      #sxyID <- 80
+      
+      index <- detectorIndex[sxyID,1:nDetectorsLESS[sxyID]]
+      plot(habCoordsxy[,2]~habCoordsxy[,1], pch=16, cex=0.1)
+      points(habCoordsxy[sxyID,2]~habCoordsxy[sxyID,1], pch=16, cex=0.4, col="orange")
+      
+      points(detectors.xy[,2]~detectors.xy[,1], pch=16, cex=0.2, col="red")
+      points(detectors.xy[index,2]~detectors.xy[index,1], pch=16, cex=0.4, col="blue")
+      points(SXY[2]~SXY[1], bg="red", pch=21, cex=1.2)
+      
+   }
+   
+   return <-list( habitatID = habitatID,
+                  detectorIndex = detectorIndex,
+                  nDetectorsLESS = nDetectorsLESS,
+                  maxNBDets = maxNBDets,
+                  ResizeFactor = ResizeFactor)
+   
+   return(return)
+}
+
+
+GetSparseY <- function( y = y
+                        , Nodetections = -1
+){
+   # IF SNAPSHOT, CONVERT TO ARRAY
+   if(length(dim(y))==2){
+      Y <- array(y, c(dim(y),1))
+   }else{Y <- y}
+   
+   # NUMBER OF DETECTIONS FOR EACH ID
+   nbDetections <- apply(Y, c(1,3), function(x) length(which(x>0)))
+   
+   ySparseDets <- array(-1, c(dim(Y)[1],max(nbDetections), dim(Y)[3]))
+   ySparse <- array(-1, c(dim(Y)[1],max(nbDetections), dim(Y)[3]))
+   
+   # FILL IN THE ARRAYS
+   for(t in 1:dim(Y)[3]){
+      for(i in 1:dim(Y)[1]){
+         if(nbDetections[i,t]>0){
+            # GET WHERE (DETECTOR ID) DETECTIONS OCCUR
+            ySparseDets[i, 1:nbDetections[i,t],t] <- which(Y[i,,t]>0)
+            # GET NUMBE OF DETECTIONS 
+            ySparse[i, 1:nbDetections[i,t],t] <- Y[i, which(Y[i,,t]>0),t]
+         }
+      }
+   }   
+   
+   
+   return(list( y = ySparse ## Detection array 
+                ,yDets = ySparseDets
+                ,nbDetections = nbDetections
+                ,nMaxDetectors = max(nbDetections)))
+   
+}
+
+#' @title Function to calculate new coordinates from a SpatialPointsDataFrame object based on a another SpatialPointsDataFrame that contains locations of grid cell centers of a regular grid.
+#' #'
+#' @description
+#' \code{UTMToGrid} returns a dataframe with x and y coordinates.
+#' 
+#' @param data.sp \code{SpatialPointsDataframe} with with points for which new coordinates are to be calculated. 
+#' @param grid.sp \code{SpatialPointsDataframe} with with points at grid cell centers  of the grid that will form the basis of the transformation to from utm to grid units.
+#' @param plot.check Logical for whether \code{True} or not (\code{FALSE}) plots are to be generated execution.
+#' @param data.sxy An \code{array} up to 5 dimensions with the posterior sxy coordinates. xy are assumed to be placed on the 3 dimension of the array.  
+#' @author Richard Bischof, \email{richard.bischof@@nmbu.no}
+#' @backref R/UTMToGrid.R
+#' @keywords SCR data prep
+#'
+#' @examples
+#' # UTMToGrid:
+#' 
+#'UTMToGrid(data.sp = detector.sp, grid.sp = habitat.sp, plot.check = TRUE)
+#'UTMToGrid(data.sp = habitat.sp, grid.sp = habitat.sp, plot.check = TRUE)
+#
+#' 
+#' 
+#'  
+
+UTMToGrid <- function(
+   data.sp,
+   grid.sp,
+   data.sxy = NULL,
+   plot.check = TRUE)
+{
+   # PREPARE THE DATA
+   grid.xy <- as.array(coordinates(grid.sp))
+   dimnames(grid.xy) <- list(1:length(grid.sp), c("x","y"))
+   
+   # CHECK IF THE DATA ARE THE POSTERIOR SXY 
+   if(is.null(data.sxy)){
+      data.xy <- as.array(coordinates(data.sp))
+      dimnames(data.xy) <- list(1:length(data.sp), c("x","y"))
+   }else{
+      data.xy <- data.sxy
+   }
+   
+   # CALCULATE THE RESOLUTION
+   resolution <- min(diff(unique(sort(grid.xy[ ,"x"]))))#---assumes square grid cells and utm projection (units in meters or km; not latlong!)
+   
+   
+   ## obtain x and y min
+   start0.y <- max(grid.xy[ ,"y"]) + resolution/2 #---because we are moving from top to bottom
+   start0.x <- min(grid.xy[ ,"x"]) - resolution/2 #---because we are moving from left to right
+   
+   ##---- TO CHECK: re-projecting the grid cell centers
+   grid.scaled.xy <- grid.xy
+   
+   grid.scaled.xy[ ,"y"] <- (start0.y - grid.xy[ ,"y"])/resolution
+   grid.scaled.xy[ ,"x"] <- (grid.xy[ ,"x"] - start0.x)/resolution
+   
+   ##---- REPROJECTING THE DATA
+   if(length(dim(data.xy))==2){
+      data.scaled.xy <- data.xy
+      data.scaled.xy[ ,"y"] <- (start0.y - data.xy[ ,"y"])/resolution
+      data.scaled.xy[ ,"x"] <- (data.xy[ ,"x"] - start0.x)/resolution 
+   }
+   ##  DEAL WITH CASES WHERE WE HAVE SXY 
+   # ITEATIONS,i,xy
+   if(length(dim(data.xy))==3){
+      data.scaled.xy <- data.xy
+      data.scaled.xy[ ,2,] <- (start0.y - data.xy[ ,2,])/resolution
+      data.scaled.xy[ ,1,] <- (data.xy[ ,1,] - start0.x)/resolution
+   }
+   # ITEATIONS,i,xy,t
+   if(length(dim(data.xy))==4){
+      data.scaled.xy <- data.xy
+      data.scaled.xy[ ,2,,] <- (start0.y - data.xy[,2,,])/resolution 
+      data.scaled.xy[ ,1,,] <- (data.xy[ ,1,,] - start0.x)/resolution 
+   }
+   # ITEATIONS,i,xy,t,??
+   if(length(dim(data.xy))==5){
+      data.scaled.xy <- data.xy
+      data.scaled.xy[ ,2,,,] <- (start0.y - data.xy[,2,,,])/resolution 
+      data.scaled.xy[ ,1,,,] <- (data.xy[ ,1,,,] - start0.x)/resolution 
+   }
+   
+   ##---- TO CHECK: re-projecting the grid cell centers
+   
+   if(is.null(data.sxy)){
+      if(plot.check==TRUE){
+         if(all(par()$mfrow==c(1,1))) par(mfrow=c(1,2), mar=c(5,5,1,1))
+         
+         plot(rbind(grid.sp), col="white", main="Original")
+         plot(grid.sp, add=TRUE, pch=19, col="darkgreen", cex=0.6)
+         plot(data.sp, pch=19, col="orange", add=TRUE)
+         plot((0-y) ~ x,rbind(data.scaled.xy, grid.scaled.xy), type="n", main="Gridded", axes=FALSE)
+         
+         axis(1)
+         axis(2, at=seq(0, 0 - max(round(data.scaled.xy[ ,"x"],0)), -ceiling(0.1*max(round(data.scaled.xy[ ,"x"], 0)))), 
+              labels=seq(0, max(round(data.scaled.xy[,"x"],0)), ceiling(0.1 * max(round(data.scaled.xy[ ,"x"], 0)))))
+         points((0-y) ~ x, grid.scaled.xy, pch=19, col="darkgreen", cex=0.6)
+         temp.y <- 0-(1:max(round(grid.scaled.xy[ ,"y"], 0)))
+         temp.x <- 1:max(round(grid.scaled.xy[ ,"x"],0))
+         segments(-10000, temp.y, 10000, temp.y, col="darkgreen")
+         segments(temp.x, -10000, temp.x, 10000, col="darkgreen")
+         points((0-y)~x, data.scaled.xy, pch=19, col="orange")
+      }
+   }else{print("Plotting function not available for data.sxy")}
+   
+   out <- list(grid.scaled.xy = grid.scaled.xy,
+               grid.xy = grid.xy,
+               data.scaled.xy = data.scaled.xy,
+               data.xy = data.xy)
+   
+   return(out)
+}
+
+
