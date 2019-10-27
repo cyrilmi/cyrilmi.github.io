@@ -40,7 +40,7 @@ library(coda)
 ```
 
 
-Download the .R data file Containing the R functions [here](http://cyrilmi.github.io/Interruptions/SourceRFunctions.R), the Nimble functions [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R) and [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R) 
+Download the .R data file Containing the R functions [here](http://cyrilmi.github.io/Interruptions/SourceRFunctions.R), the Nimble functions [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R) and [here](http://cyrilmi.github.io/Interruptions/SourceNimblePointProcess.R) 
 
 Set working directory where the *SourceRFunctions.R*, *SourceNimblePointProcess.R* and *SourceNimbleObservationModel.R* are located and source the files.
 
