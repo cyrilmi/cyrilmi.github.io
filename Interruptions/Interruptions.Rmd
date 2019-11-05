@@ -1,11 +1,12 @@
 ---
-title: "Supporting information 2: Estimating abundance with interruption in data collection.
-  Simulations and case studies using open population spatial capture-recapture"
+title: 'Supporting information 2: Estimating abundance with interruption in data collection.
+  Simulations and case studies using open population spatial capture-recapture'
 author: "Cyril Milleret"
-date: 5 November 2019
-output: html_document
+date: "5 November 2019"
+output:
+  pdf_document: default
+  html_document: default
 bibliography: references.bib
-
 ---
   
   <!---
@@ -89,8 +90,8 @@ augmentation <- 1.2 # DATASET IS AUGMENTED BY N AUGMENTED INDIVIDUALS THAT EQUAL
 #SUPERPOPULATION SIZE * augmentation
 
 # NIMBLE RUN CHARACTERISTICS 
-nburnin <- 100   # BURN-IN
-niter <- 150     # N ITERATIONS
+nburnin <- 2000   # BURN-IN
+niter <- 6000     # N ITERATIONS
 nchains <- 3      # N CHAINS
 
 ```
