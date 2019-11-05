@@ -1,6 +1,6 @@
 ---
 layout: page
 title: simple site
-tagline: Some code
+tagline: Some codes
 description: Some R codes to support different articles 
 ---
