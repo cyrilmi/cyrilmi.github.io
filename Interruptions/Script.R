@@ -492,23 +492,23 @@ myNimbleOutput <- runMCMC(mcmc = cMCMC,
 
 # N
 for(t in 1:n.occasions){ 
-  PlotJagsParams(myNimbleOutput, params= paste("N[",t,"]", sep=""), sim.values=Pop.Compo[[2]][t])
+  PlotParams(myNimbleOutput, params= paste("N[",t,"]", sep=""), sim.values=Pop.Compo[[2]][t])
 }
 
 # SIGMA
-PlotJagsParams(myNimbleOutput, params= "sigma", sim.values=sigma/res(r))
+PlotParams(myNimbleOutput, params= "sigma", sim.values=sigma/res(r))
 
 # p0
-PlotJagsParams(myNimbleOutput, params= "p0", sim.values=p0)
+PlotParams(myNimbleOutput, params= "p0", sim.values=p0)
 
 # tau
-PlotJagsParams(myNimbleOutput, params= "tau", sim.values=tau/res(r))
+PlotParams(myNimbleOutput, params= "tau", sim.values=tau/res(r))
 
 # phi
-PlotJagsParams(myNimbleOutput, params= "phi", sim.values=phi)
+PlotParams(myNimbleOutput, params= "phi", sim.values=phi)
 
 # rho
-PlotJagsParams(myNimbleOutput, params= "rho", sim.values=rho)
+PlotParams(myNimbleOutput, params= "rho", sim.values=rho)
 
 
 
