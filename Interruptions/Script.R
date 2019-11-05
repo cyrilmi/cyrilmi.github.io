@@ -1,34 +1,4 @@
----
-title: "Supporting information 2: Estimating abundance with interruption in data collection.
-  Simulations and case studies using open population spatial capture-recapture"
-author: "Cyril Milleret"
-date: 18 October 2019
-output: html_document
-bibliography: references.bib
 
----
-  
-  <!---
-  http://cyrilmi.github.io/Interruptions/Interruptions.html 
--->
-  
-  
-  
-  <!--
-  Back to [NIMBLE Vignettes](https://cyrilmi.github.io/Interruptions/Interruptions.html) 
--->
-  
-  
-  \  
-
-This script performs a data set simulation and OPSCR modelling in the presence of sampling interruption with NIMBLE [@NIMBLE; @deValpine2017]. All details about the procedure are provided in Milleret et al. Estimating abundance with interruption in data collection: Simulations and case studies using open population spatial capture-recapture models.
-
-
-\   
-
-## I. Load Libraries 
-
-```{r message = FALSE}
 library(rgdal)
 library(raster)
 library(rgeos)
@@ -37,32 +7,14 @@ library(nimble)
 library(abind)
 library(boot)
 library(coda)
-```
 
-
-Download the .R data file Containing the R functions [here](http://cyrilmi.github.io/Interruptions/SourceRFunctions.R), the Nimble functions [here](http://cyrilmi.github.io/Interruptions/SourceNimbleObservationModel.R), [here](http://cyrilmi.github.io/Interruptions/SourceNimblePointProcess.R) and  [here](http://cyrilmi.github.io/Interruptions/Script.R) is the R script.
-
-Set working directory where the *SourceRFunctions.R*, *SourceNimblePointProcess.R* and *SourceNimbleObservationModel.R* are located and source the files.
-
-```{r source1, echo=T,eval=FALSE}
-setwd("YourWorkingdirectory")
-source("SourceRFunctions.R")
-source("SourceNimblePointProcess.R")
-source("SourceNimbleObservationModel.R")
-```
-
-
-```{r source, echo=F,message=FALSE,warning=FALSE,cache.comments=TRUE}
+#setwd("YourWorkingdirectory")
 setwd("C:/Personal_Cloud/OneDrive/Work/PublicCodesGit/cyrilmi.github.io/Interruptions")
+
 source("SourceRFunctions.R")
 source("SourceNimblePointProcess.R")
 source("SourceNimbleObservationModel.R")
-```
 
-
-
-## II.SET SIMULATION PARAMETERS
-```{r 1, echo=T}
 # HABITAT EXTENT 
 buffer <- 5
 grid.size <- 30
@@ -89,14 +41,11 @@ augmentation <- 1.2 # DATASET IS AUGMENTED BY N AUGMENTED INDIVIDUALS THAT EQUAL
 #SUPERPOPULATION SIZE * augmentation
 
 # NIMBLE RUN CHARACTERISTICS 
-nburnin <- 1000   # BURN-IN
-niter <- 5000     # N ITERATIONS
-nchains <- 3      # N CHAINS
+nburnin <- 100   # BURN-IN
+niter <- 300    # N ITERATIONS
+nchains <- 2     # N CHAINS
 
-```
 
-## III.CREATE SIMULATED DATASET
-```{r 2, echo=T}
 ### ==== 1.CREATE A SQUARE SPATIAL DOMAIN WHERE DETECTORS WILL BE PLACED  ==== 
 coords <- matrix(c(0                   , 0                   ,
                    grid.size + buffer*2, 0                   ,
@@ -107,7 +56,7 @@ coords <- matrix(c(0                   , 0                   ,
 
 P1 <- Polygon(coords)
 myStudyArea <-  SpatialPolygons(list(Polygons(list(P1), ID = "a")),
-proj4string=CRS("+proj=utm +zone=33 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
+                                proj4string=CRS("+proj=utm +zone=33 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
 ### ====  1.1. HABITAT OBJECTS  ====
 r <- raster(nrow=4, ncol=4, xmn=0, xmx=grid.size + buffer*2, ymn=0, ymx=grid.size + buffer*2)
 
@@ -143,30 +92,30 @@ phit <- 0
 fect <- 0
 
 for(t in 1:n.occasions){
-   # DEFINE THE PHI MATRIX
-   # two states: ALIVE/DEAD
-   # DRAW PHI FROM NORMAL DISTRIB AND APPLY LOGIT 
-   phit[t]  <-   inv.logit(rnorm(1, mean=logit(phi), sd=sd.phi))
-   PHI.arr[,,t] <-  matrix(c(phit[t]       , 0, 
-                             1-phit[t] , 1 ), ncol=2, nrow=2, byrow = TRUE)
-   # DEFINE REPRO MATRIX (p of reproducing)
-   # THIS DEFINES THE PROBABILITY OF INDIVIDUALS TO REPRODUCE (ASSUME ALL INDIVIDUALS REPRODUCE HERE)
-   REPRO.arr[,,t] = matrix(c( p.repro, 0,
-                              0      , 0 ), ncol=2, nrow=2, byrow = TRUE)
-   # DEFINE PER CAPITA RECRUITMENT. GIVEN THAT INDIVIDUAL REPRODUCES, HOW MANY ARE RECRUITED
-   fect[t] <-   inv.logit(rnorm(1, mean=logit(rho), sd=sd.rho))
-   FEC.mat[,t] = c(fect[t], 0)
+  # DEFINE THE PHI MATRIX
+  # two states: ALIVE/DEAD
+  # DRAW PHI FROM NORMAL DISTRIB AND APPLY LOGIT 
+  phit[t]  <-   inv.logit(rnorm(1, mean=logit(phi), sd=sd.phi))
+  PHI.arr[,,t] <-  matrix(c(phit[t]       , 0, 
+                            1-phit[t] , 1 ), ncol=2, nrow=2, byrow = TRUE)
+  # DEFINE REPRO MATRIX (p of reproducing)
+  # THIS DEFINES THE PROBABILITY OF INDIVIDUALS TO REPRODUCE (ASSUME ALL INDIVIDUALS REPRODUCE HERE)
+  REPRO.arr[,,t] = matrix(c( p.repro, 0,
+                             0      , 0 ), ncol=2, nrow=2, byrow = TRUE)
+  # DEFINE PER CAPITA RECRUITMENT. GIVEN THAT INDIVIDUAL REPRODUCES, HOW MANY ARE RECRUITED
+  fect[t] <-   inv.logit(rnorm(1, mean=logit(rho), sd=sd.rho))
+  FEC.mat[,t] = c(fect[t], 0)
 }
 
 
 
 ### ====  3.2 SIMULATE Z ====  
 z.mx <- SimulateZ( N0 = N1,
-                      n.occasions = n.occasions-1, 
-                      PHI = PHI.arr, 
-                      REPRO = REPRO.arr, 
-                      FEC = FEC.mat, 
-                      init.state = 1) 
+                   n.occasions = n.occasions-1, 
+                   PHI = PHI.arr, 
+                   REPRO = REPRO.arr, 
+                   FEC = FEC.mat, 
+                   init.state = 1) 
 myZ <- z.mx$z
 # ADD THE NOT ENTERED STATE
 # 1: NOT ENTERERD
@@ -180,7 +129,7 @@ z.levels <- unique(na.omit(unlist(apply(myZ, 1, unique))))
 z.levels <- z.levels[order(z.levels)]
 Pop.Compo <- list()
 for(l in 1:length(z.levels)){
-   Pop.Compo[[l]] <- apply(myZ, 2, function(x){length(which(x == z.levels[l]))})
+  Pop.Compo[[l]] <- apply(myZ, 2, function(x){length(which(x == z.levels[l]))})
 }#l
 
 # PLOT CHECK 
@@ -189,7 +138,7 @@ plot(1:dim(myZ)[2], Pop.Compo[[1]], type="l", col=1, lwd=2,
      xlab = "Years", ylab = "# of Individuals")
 
 for(l in 2:length(Pop.Compo)){
-   points(1:dim(myZ)[2],Pop.Compo[[l]], type="l", col=l, lwd=2)
+  points(1:dim(myZ)[2],Pop.Compo[[l]], type="l", col=l, lwd=2)
 }#l
 legend("bottomleft"
        , legend =  c(unlist(lapply(z.levels, function(x){paste(" State", x)})), "Total")
@@ -206,12 +155,12 @@ tempCoords <- matrix(NA,nrow=dim(myZ)[1], ncol=2)
 
 # SIMULATE UNIFORM LOCATION OF ACS
 for(i in 1:dim(myZ)[1]){
-   tempCoords[i,] <- rbinomPPSingle( n = 1
-                                     , lowerCoords = lowerCoords
-                                     , upperCoords = upperCoords
-                                     , intensityWeights = habitatQuality
-                                     , areAreas = 1
-                                     , numWindows = nrow(lowerCoords))
+  tempCoords[i,] <- rbinomPPSingle( n = 1
+                                    , lowerCoords = lowerCoords
+                                    , upperCoords = upperCoords
+                                    , intensityWeights = habitatQuality
+                                    , areAreas = 1
+                                    , numWindows = nrow(lowerCoords))
 }#i
 
 # STORE ACS IN A SP OBJECT
@@ -226,22 +175,22 @@ mySimulatedACs[[1]] <- SpatialPointsDataFrame( tempCoords
 # THERE IS THE POSSIBILITY TO DEFINE A HABITAT QUALITY SURFACE
 # FOR THE PUPORSE OF THE STUDY, HABITAT QUALITY WAS UNIFORM (SET TO 1 EVERYWHERE)
 for(t in 2:dim(myZ)[2]){
-   for(i in 1:nrow(tempCoords)){
-      tempCoords[i,]  <- rbinomMNormSourcePPSingle( n = 1
-                                                    , lowerCoords = lowerCoords
-                                                    , upperCoords = upperCoords
-                                                    , sourceCoords = tempCoords[i,]
-                                                    , normSD = tau
-                                                    , intensityWeights = habitatQuality
-                                                    , areAreas = 1
-                                                    , numWindows = nrow(lowerCoords))
-   }
-   # STORE ACS IN A SP OBJECT
-   mySimulatedACs[[t]] <- SpatialPointsDataFrame( tempCoords
-                                                  , data.frame( x = tempCoords[, 1]
-                                                                , y = tempCoords[, 2]
-                                                                , Id = 1:nrow(tempCoords))
-                                                  , proj4string = CRS(proj4string(mySimulatedACs[[t-1]])))
+  for(i in 1:nrow(tempCoords)){
+    tempCoords[i,]  <- rbinomMNormSourcePPSingle( n = 1
+                                                  , lowerCoords = lowerCoords
+                                                  , upperCoords = upperCoords
+                                                  , sourceCoords = tempCoords[i,]
+                                                  , normSD = tau
+                                                  , intensityWeights = habitatQuality
+                                                  , areAreas = 1
+                                                  , numWindows = nrow(lowerCoords))
+  }
+  # STORE ACS IN A SP OBJECT
+  mySimulatedACs[[t]] <- SpatialPointsDataFrame( tempCoords
+                                                 , data.frame( x = tempCoords[, 1]
+                                                               , y = tempCoords[, 2]
+                                                               , Id = 1:nrow(tempCoords))
+                                                 , proj4string = CRS(proj4string(mySimulatedACs[[t-1]])))
 }#t
 
 # PLOT CHECK
@@ -251,11 +200,11 @@ col <- rainbow(length(mySimulatedACs[[1]]))
 points(mySimulatedACs[[1]], pch=21, bg=col)
 
 for(t in 2:length(mySimulatedACs)){
-   points(mySimulatedACs[[t]], pch=21, bg=col)
-   arrows( x0 = coordinates(mySimulatedACs[[t]])[ ,1]
-           , x1 = coordinates(mySimulatedACs[[t-1]])[ ,1]
-           , y0 = coordinates(mySimulatedACs[[t]])[ ,2]
-           , y1 = coordinates(mySimulatedACs[[t-1]])[ ,2], col = col, length = 0.08)
+  points(mySimulatedACs[[t]], pch=21, bg=col)
+  arrows( x0 = coordinates(mySimulatedACs[[t]])[ ,1]
+          , x1 = coordinates(mySimulatedACs[[t-1]])[ ,1]
+          , y0 = coordinates(mySimulatedACs[[t]])[ ,2]
+          , y1 = coordinates(mySimulatedACs[[t-1]])[ ,2], col = col, length = 0.08)
 }#t
 
 
@@ -265,40 +214,40 @@ z.not.alive <- apply(myZ, 2, function(x){which(x %in% c(1,3))})
 Y <- array(NA, c(dim(myZ)[1], length(detectors.sp), dim(myZ)[2]))
 
 for(t in 1:dim(myZ)[2]){
-   D <- gDistance(detectors.sp, mySimulatedACs[[t]], byid=TRUE)
-   # OBTAIN Y DETECTION MATRIX USING HALF NORMAL DETECTION FUNCTION (EQN 7 IN MAIN TEXT)
-   fixed.effects <- rep(log(p0), length(detectors.sp))
-   pzero <- exp(fixed.effects)
-   p <- pzero * exp(-D*D/(2*sigma*sigma))
-   Y[,,t] <- apply(p, c(1,2), function(x) rbinom(1, 1, x))
-   # individuals not alive can't be detected
-   Y[z.not.alive[[t]],,t] <- 0
-   
+  D <- gDistance(detectors.sp, mySimulatedACs[[t]], byid=TRUE)
+  # OBTAIN Y DETECTION MATRIX USING HALF NORMAL DETECTION FUNCTION (EQN 7 IN MAIN TEXT)
+  fixed.effects <- rep(log(p0), length(detectors.sp))
+  pzero <- exp(fixed.effects)
+  p <- pzero * exp(-D*D/(2*sigma*sigma))
+  Y[,,t] <- apply(p, c(1,2), function(x) rbinom(1, 1, x))
+  # individuals not alive can't be detected
+  Y[z.not.alive[[t]],,t] <- 0
+  
 }#t
 ### ====  5.1 PLOT CHECK ====
 par(mfrow=c(2,3), mar=c(0,0,3,0))
 for(t in 1:dim(myZ)[2]){
-   plot(myStudyArea)
-   title(t)
-   points(detectors.sp, pch=16, cex=0.6) 
-   detections <- apply(Y[,,t],1, function(x) which(x>0))
-   col <- rainbow(dim(Y)[1])[sample(dim(Y)[1])]
-   for(i in 1:length(detections)){
-      if(!i %in% z.not.alive[[t]]){
-         if(length(detectors.sp[detections[[i]],])==0){
-            points(mySimulatedACs[[t]][i,],bg=col[i], pch=21, cex=0.5)
-            points(mySimulatedACs[[t]][i,], col=col[i], pch=4)
-            
-         }else{
-            points(detectors.sp[detections[[i]],],col=col[i], pch=16, cex=0.7)
-            ac <- coordinates(mySimulatedACs[[t]][i,])
-            dets <- coordinates(detectors.sp[detections[[i]],])
-            segments(x0=ac[1,1], x1=dets[,1] , y0=ac[1,2], y1=dets[,2], col=col[i])
-            points(mySimulatedACs[[t]][i,],bg=col[i], pch=21)
-            
-         }#else
-      }#if
-   }#i   
+  plot(myStudyArea)
+  title(t)
+  points(detectors.sp, pch=16, cex=0.6) 
+  detections <- apply(Y[,,t],1, function(x) which(x>0))
+  col <- rainbow(dim(Y)[1])[sample(dim(Y)[1])]
+  for(i in 1:length(detections)){
+    if(!i %in% z.not.alive[[t]]){
+      if(length(detectors.sp[detections[[i]],])==0){
+        points(mySimulatedACs[[t]][i,],bg=col[i], pch=21, cex=0.5)
+        points(mySimulatedACs[[t]][i,], col=col[i], pch=4)
+        
+      }else{
+        points(detectors.sp[detections[[i]],],col=col[i], pch=16, cex=0.7)
+        ac <- coordinates(mySimulatedACs[[t]][i,])
+        dets <- coordinates(detectors.sp[detections[[i]],])
+        segments(x0=ac[1,1], x1=dets[,1] , y0=ac[1,2], y1=dets[,2], col=col[i])
+        points(mySimulatedACs[[t]][i,],bg=col[i], pch=21)
+        
+      }#else
+    }#if
+  }#i   
 }#t
 
 ### ==== 6.AUGMENT DATA SET ====
@@ -316,8 +265,8 @@ dim(y)
 ### ==== 7.ADD INTERUPTION ====
 interuptions <- which(toggle.interuption==0)
 if(length(interuptions)>0){
-   # ZERO DETECTIONS DURING INTERUPTIONS
-   y[,,interuptions] <- 0
+  # ZERO DETECTIONS DURING INTERUPTIONS
+  y[,,interuptions] <- 0
 }
 
 ### ==== 8.RECONSTRUCT z VALUES ====
@@ -325,31 +274,30 @@ z <- apply(y, c(1,3), function(x) any(x>0))
 z <- ifelse(z, 2, NA)
 
 z <- t(apply(z, 1, function(zz){
-   if(any(!is.na(zz))){
-      range.det <- range(which(!is.na(zz)))
-      zz[range.det[1]:range.det[2]] <- 2
-   }
-   return(zz)
+  if(any(!is.na(zz))){
+    range.det <- range(which(!is.na(zz)))
+    zz[range.det[1]:range.det[2]] <- 2
+  }
+  return(zz)
 }))
 
 ### ==== 9.GENERATE z INITIAL values====
 z.init <- t(apply(z, 1, function(zz){
-   out <- zz
-   out[] <- 1
-   if(any(!is.na(zz))){
-      range.det <- range(which(!is.na(zz)))
-      if(range.det[1]>1)zz[1:(range.det[1]-1)] <- 1
-      if(range.det[2]<length(zz))zz[(range.det[2]+1):length(zz)] <- 3
-      out[] <- zz
-   } 
-   return(out)
+  out <- zz
+  out[] <- 1
+  if(any(!is.na(zz))){
+    range.det <- range(which(!is.na(zz)))
+    if(range.det[1]>1)zz[1:(range.det[1]-1)] <- 1
+    if(range.det[2]<length(zz))zz[(range.det[2]+1):length(zz)] <- 3
+    out[] <- zz
+  } 
+  return(out)
 }))
 
 z.init <- ifelse(!is.na(z), NA, z.init)
-```
+
 
 ## III.NIMBLE
-```{r 3, echo=T}
 ### ==== 1.MODEL CODE ==== 
 modelCode <- nimbleCode({
   ##-----------------------------------------------------------------------------------------------
@@ -368,10 +316,10 @@ modelCode <- nimbleCode({
                                                  , mu[1:n.cells]
                                                  , 1
                                                  , n.cells,-1)
-
+      
     }#t
   }#i
-
+  
   
   ##-----------------------------------------------------------------------------------------------
   ##-------------------------------## 
@@ -429,11 +377,11 @@ modelCode <- nimbleCode({
                                                             , habitatID = habitatIDDet[1:y.maxDet,1:x.maxDet]
                                                             , maxDist = maxDist
                                                             , indicator = z[i,t]==2)
-
-
+      
+      
     }#t
   }#i
-
+  
   
   ##----------------------------------------------------------------------------------------------										  
   ##----------------------------------------## 
@@ -489,17 +437,7 @@ for( t in 1:dim(sxy)[3]){
 
 nimInits <- list(z = z.init, rho = rho, phi = phi, sigma = sigma,
                  psi = 0.1, p0 = p0, sxy = sxy, tau = tau)
-```
-## III.NIMBLE TRICKS 
-Here we need to create a few objects that are necessary to make the computation of OPSCR models more efficient.
-The first step consists in performing a local evaluation of the state space (LESS) [@Milleret2019]. This means that detectors that are further away than a certain distance from a given individual activity center are not evaluated. If the distance threshold is large enough, it should not cause any bias (see @Milleret2019 for further details). 
 
-The function GetDetectorIndex identifies the set of detectors that are within a certain distance from each habitat cell center. The distance value should be large enough so that for any particular individual, the sxy values of the initial activity center restrict the calculation of p0 to all detectors with positive detections. Here, we use maxDist=2.2.
-
-When the dimensions of the habitat matrix is large, we can resize it to lower dimensions. This may help reducing the number of habitat cells for which we have to identify the set of detectors that are within a certain distance from the cell center. The ResizeFactor argument which corresponds to the the fact argument used internally in raster::disaggregate. The goal is to create the object DetectorIndex$detectorIndex of the smallest dimension possible.
-
-
-```{r 4, echo=T}
 ### ==== 1. CREATE CACHED DETECTORS OBJECTS ====
 DetectorIndexLESS <- GetDetectorIndexLESS(habitat.mx = as.matrix(r),
                                           detectors.xy = myScaledDetectors$data.scaled.xy,
@@ -518,12 +456,7 @@ nimConstants$n.cellsSparse <- dim(DetectorIndexLESS$detectorIndex)[1]
 nimConstants$ResizeFactor <- DetectorIndexLESS$ResizeFactor
 nimConstants$maxDist <- 2.2
 
-```
 
-Last, we re-express the detection matrix y to reduce its size. We use a new representation, where each row (corresponding to one individual) contains the detector identification numbers (values of j) which detected that individual.
-
-A second matrix of identical dimension was also created, containing the number of detections occurring at each detector. The second matrix would be necessary for modelling non-binary detections.
-```{r 5, echo=T}
 ### ==== 2. CREATE SPARSE MATRICES ====
 
 SparseY <- GetSparseY(nimData$y)
@@ -537,10 +470,8 @@ nimData$trials = rep(1, nimConstants$n.detectors)
 
 nimConstants$nMaxDetectors = SparseY$nMaxDetectors
 
-```
 
 
-```{r NIMBLE, echo=T}
 ## IV.NIMBLE RUN 
 model <- nimbleModel(code = modelCode, constants = nimConstants,
                      data = nimData, inits = nimInits, check = FALSE, calculate = FALSE)
@@ -551,16 +482,14 @@ MCMCconf <- configureMCMC(model = model, monitors = c(params),
                           useConjugacy = FALSE)
 MCMC <- buildMCMC(MCMCconf)
 cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE)
-set.seed(0)
 myNimbleOutput <- runMCMC(mcmc = cMCMC,
                           nburnin = nburnin, niter = niter, nchains = nchains, samplesAsCodaMCMC = TRUE)
 
 
-```
 
 
 ## V.PLOT OUTPUT  
-```{r PLOT, echo=T}
+
 # N
 for(t in 1:n.occasions){ 
   PlotJagsParams(myNimbleOutput, params= paste("N[",t,"]", sep=""), sim.values=Pop.Compo[[2]][t])
@@ -580,8 +509,6 @@ PlotJagsParams(myNimbleOutput, params= "phi", sim.values=phi)
 
 # rho
 PlotJagsParams(myNimbleOutput, params= "rho", sim.values=rho)
-```
 
-## REFERENCES
 
 
