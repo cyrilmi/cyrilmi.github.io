@@ -1,9 +1,10 @@
 ---
-title: 'Supporting information 2: Estimating abundance with interruption in data collection.
-  Simulations and case studies using open population spatial capture-recapture'
-author: "Cyril Milleret"
-date: "5 November 2019"
+title: 'Appendix S2: Estimating abundance with interruptions in data collection using
+  open population spatial capture-recapture models Ecosphere'
+author: "C. Milleret, P. Dupont, J. Chipperfield, D. Turek, H. Broseth, O. Gimenez, P. Valpine, R. Bischof"
+date: "26 March 2020"
 output:
+  pdf_document: default
   html_document: default
 bibliography: references.bib
 ---
@@ -21,14 +22,14 @@ bibliography: references.bib
   
   \  
 
-This script performs a data set simulation and OPSCR modelling in the presence of sampling interruption with NIMBLE [@NIMBLE; @deValpine2017]. All details about the procedure are provided in Milleret et al. Estimating abundance with interruption in data collection: Simulations and case studies using open population spatial capture-recapture models.
+This script performs a data set simulation and OPSCR modelling in the presence of sampling interruption with NIMBLE [@NIMBLE; @deValpine2017]. All details about the procedure are provided in Milleret et al. Estimating abundance with interruptions in data collection using open population spatial capture-recapture models. Ecosphere.
 
 
 \   
 
 ## I. Load Libraries 
 
-```{r message = FALSE}
+```{r message = FALSE,warning=FALSE}
 library(rgdal)
 library(raster)
 library(rgeos)
@@ -52,7 +53,7 @@ source("SourceNimbleObservationModel.R")
 ```
 
 
-```{r source, echo=F,message=FALSE,warning=FALSE,cache.comments=TRUE}
+```{r source, echo=F,message=FALSE,warning=FALSE,cache.comments=TRUE,include=FALSE}
 setwd("C:/Personal_Cloud/OneDrive/Work/PublicCodesGit/cyrilmi.github.io/Interruptions")
 source("SourceRFunctions.R")
 source("SourceNimblePointProcess.R")
@@ -89,8 +90,8 @@ augmentation <- 1.2 # DATASET IS AUGMENTED BY N AUGMENTED INDIVIDUALS THAT EQUAL
 #SUPERPOPULATION SIZE * augmentation
 
 # NIMBLE RUN CHARACTERISTICS 
-nburnin <- 100   # BURN-IN
-niter <- 200     # N ITERATIONS
+nburnin <- 2000   # BURN-IN
+niter <- 10000     # N ITERATIONS
 nchains <- 3      # N CHAINS
 
 ```
@@ -206,12 +207,14 @@ tempCoords <- matrix(NA,nrow=dim(myZ)[1], ncol=2)
 
 # SIMULATE UNIFORM LOCATION OF ACS
 for(i in 1:dim(myZ)[1]){
-   tempCoords[i,] <- rbinomPPSingle( n = 1
-                                     , lowerCoords = lowerCoords
-                                     , upperCoords = upperCoords
-                                     , intensityWeights = habitatQuality
-                                     , areAreas = 1
-                                     , numWindows = nrow(lowerCoords))
+   tempCoords[i,] <- rbinomPPSingle(
+     n = 1
+, lowerCoords = lowerCoords
+, upperCoords = upperCoords
+, intensityWeights = habitatQuality
+, areAreas = 1
+, numWindows = nrow(lowerCoords)
+   )
 }#i
 
 # STORE ACS IN A SP OBJECT
@@ -227,21 +230,25 @@ mySimulatedACs[[1]] <- SpatialPointsDataFrame( tempCoords
 # FOR THE PUPORSE OF THE STUDY, HABITAT QUALITY WAS UNIFORM (SET TO 1 EVERYWHERE)
 for(t in 2:dim(myZ)[2]){
    for(i in 1:nrow(tempCoords)){
-      tempCoords[i,]  <- rbinomMNormSourcePPSingle( n = 1
-                                                    , lowerCoords = lowerCoords
-                                                    , upperCoords = upperCoords
-                                                    , sourceCoords = tempCoords[i,]
-                                                    , normSD = tau
-                                                    , intensityWeights = habitatQuality
-                                                    , areAreas = 1
-                                                    , numWindows = nrow(lowerCoords))
+      tempCoords[i,]  <- rbinomMNormSourcePPSingle(
+          n = 1
+        , lowerCoords = lowerCoords
+        , upperCoords = upperCoords
+        , sourceCoords = tempCoords[i,]
+        , normSD = tau
+        , intensityWeights = habitatQuality
+        , areAreas = 1
+        , numWindows = nrow(lowerCoords)
+      )
    }
    # STORE ACS IN A SP OBJECT
-   mySimulatedACs[[t]] <- SpatialPointsDataFrame( tempCoords
-                                                  , data.frame( x = tempCoords[, 1]
-                                                                , y = tempCoords[, 2]
-                                                                , Id = 1:nrow(tempCoords))
-                                                  , proj4string = CRS(proj4string(mySimulatedACs[[t-1]])))
+   mySimulatedACs[[t]] <- SpatialPointsDataFrame(
+     tempCoords
+    , data.frame( x = tempCoords[, 1]
+                  , y = tempCoords[, 2]
+                  , Id = 1:nrow(tempCoords))
+    , proj4string = CRS(proj4string(mySimulatedACs[[t-1]]))
+   )
 }#t
 
 # PLOT CHECK
@@ -352,14 +359,16 @@ z.init <- ifelse(!is.na(z), NA, z.init)
 ```{r 3, echo=T}
 ### ==== 1.MODEL CODE ==== 
 modelCode <- nimbleCode({
-  ##-----------------------------------------------------------------------------------------------
+  ##--------------------------------------------------------------------------
   ##-----------------------------## 
   ##------ SPATIAL PROCESS ------##  
   ##-----------------------------##  
   tau ~ dgamma(0.001, 0.001)
   
   for(i in 1:n.individuals){
-    sxy[i, 1:2, 1] ~ dbinomPPSingle(lowerHabCoords[1:n.cells, 1:2], upperHabCoords[1:n.cells, 1:2], mu[1:n.cells], 1, n.cells)
+    sxy[i, 1:2, 1] ~ dbinomPPSingle(lowerHabCoords[1:n.cells, 1:2],
+                                    upperHabCoords[1:n.cells, 1:2],
+                                    mu[1:n.cells], 1, n.cells)
     for(t in 2:n.years){
       sxy[i, 1:2, t] ~ dbinomMNormSourcePPSingle(lowerHabCoords[1:n.cells, 1:2]
                                                  , upperHabCoords[1:n.cells, 1:2]
@@ -373,7 +382,7 @@ modelCode <- nimbleCode({
   }#i
 
   
-  ##-----------------------------------------------------------------------------------------------
+  ##--------------------------------------------------------------------------
   ##-------------------------------## 
   ##----- DEMOGRAPHIC PROCESS -----## 
   ##-------------------------------##     
@@ -407,7 +416,7 @@ modelCode <- nimbleCode({
     } #t
   }
   
-  ##-----------------------------------------------------------------------------------------------   
+  ##--------------------------------------------------------------------------
   ##-----------------------------##
   ##----- DETECTION PROCESS -----## 
   ##-----------------------------## 
@@ -415,27 +424,26 @@ modelCode <- nimbleCode({
   p0 ~ dunif(0,1)
   for(i in 1: n.individuals){
     for(t in 1:n.years){
-      y[i,1:nMaxDetectors,t] ~ dbin_LESSCachedAllSparse  (  pZero = p0 * toggle[t]
-                                                            , sxy = sxy[i,1:2,t]
-                                                            , sigma = sigma
-                                                            , nbDetections[i,t]
-                                                            , yDets = yDets[i,1:nMaxDetectors,t]
-                                                            , detector.xy =  detector.xy[1:n.detectors,1:2]
-                                                            , trials = trials[1:n.detectors]
-                                                            , detectorIndex = detectorIndex[1:n.cellsSparse,1:maxNBDets]
-                                                            , nDetectorsLESS = nDetectorsLESS[1:n.cellsSparse]
-                                                            , ResizeFactor = ResizeFactor
-                                                            , maxNBDets = maxNBDets
-                                                            , habitatID = habitatIDDet[1:y.maxDet,1:x.maxDet]
-                                                            , maxDist = maxDist
-                                                            , indicator = z[i,t]==2)
-
-
+      y[i,1:nMaxDetectors,t] ~ dbin_LESSCachedAllSparse(
+        pZero = p0 * toggle[t]
+      , sxy = sxy[i,1:2,t]
+      , sigma = sigma
+      , nbDetections[i,t]
+      , yDets = yDets[i,1:nMaxDetectors,t]
+      , detector.xy =  detector.xy[1:n.detectors,1:2]
+      , trials = trials[1:n.detectors]
+      , detectorIndex = detectorIndex[1:n.cellsSparse,1:maxNBDets]
+      , nDetectorsLESS = nDetectorsLESS[1:n.cellsSparse]
+      , ResizeFactor = ResizeFactor
+      , maxNBDets = maxNBDets
+      , habitatID = habitatIDDet[1:y.maxDet,1:x.maxDet]
+      , maxDist = maxDist
+      , indicator = z[i,t]==2)
     }#t
   }#i
 
   
-  ##----------------------------------------------------------------------------------------------										  
+  ##--------------------------------------------------------------------------
   ##----------------------------------------## 
   ##---------- DERIVED PARAMETERS ----------##
   ##----------------------------------------##
@@ -540,7 +548,7 @@ nimConstants$nMaxDetectors = SparseY$nMaxDetectors
 ```
 
 
-```{r NIMBLE, echo=T}
+```{r NIMBLE, echo=T,include=FALSE}
 ## IV.NIMBLE RUN 
 model <- nimbleModel(code = modelCode, constants = nimConstants,
                      data = nimData, inits = nimInits, check = FALSE, calculate = FALSE)
@@ -563,23 +571,23 @@ myNimbleOutput <- runMCMC(mcmc = cMCMC,
 ```{r PLOT, echo=T}
 # N
 for(t in 1:n.occasions){ 
-  PlotJagsParams(myNimbleOutput, params= paste("N[",t,"]", sep=""), sim.values=Pop.Compo[[2]][t])
+  PlotParams(myNimbleOutput, params= paste("N[",t,"]", sep=""), sim.values=Pop.Compo[[2]][t])
 }
 
 # SIGMA
-PlotJagsParams(myNimbleOutput, params= "sigma", sim.values=sigma/res(r))
+PlotParams(myNimbleOutput, params= "sigma", sim.values=sigma/res(r))
 
 # p0
-PlotJagsParams(myNimbleOutput, params= "p0", sim.values=p0)
+PlotParams(myNimbleOutput, params= "p0", sim.values=p0)
 
 # tau
-PlotJagsParams(myNimbleOutput, params= "tau", sim.values=tau/res(r))
+PlotParams(myNimbleOutput, params= "tau", sim.values=tau/res(r))
 
 # phi
-PlotJagsParams(myNimbleOutput, params= "phi", sim.values=phi)
+PlotParams(myNimbleOutput, params= "phi", sim.values=phi)
 
 # rho
-PlotJagsParams(myNimbleOutput, params= "rho", sim.values=rho)
+PlotParams(myNimbleOutput, params= "rho", sim.values=rho)
 ```
 
 ## REFERENCES
